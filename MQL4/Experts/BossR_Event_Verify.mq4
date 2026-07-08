@@ -132,6 +132,26 @@ int OnInit()
 
    BossEvent.PollAt(hour_c);
    if(!BossEvent.IsNewHour()) Pass("Hour One Shot"); else Fail("Hour One Shot");
+      if(!BossEvent.ConfigureSession(-1, 0)) Pass("ConfigureSession rejects negative hour"); else Fail("ConfigureSession rejects negative hour");
+   if(!BossEvent.ConfigureSession(24, 0)) Pass("ConfigureSession rejects hour above 23"); else Fail("ConfigureSession rejects hour above 23");
+   if(!BossEvent.ConfigureSession(8, -1)) Pass("ConfigureSession rejects negative minute"); else Fail("ConfigureSession rejects negative minute");
+   if(!BossEvent.ConfigureSession(8, 60)) Pass("ConfigureSession rejects minute above 59"); else Fail("ConfigureSession rejects minute above 59");
+
+   if(BossEvent.Configure(Symbol(), PERIOD_M1)) Pass("Reconfigure before session tests"); else Fail("Reconfigure before session tests");
+   if(BossEvent.ConfigureSession(8, 30)) Pass("ConfigureSession valid custom session"); else Fail("ConfigureSession valid custom session");
+
+   datetime session_a = StrToTime("2026.07.08 08:29:00");
+   datetime session_b = StrToTime("2026.07.08 08:30:00");
+   datetime session_c = StrToTime("2026.07.08 08:31:00");
+
+   BossEvent.PollAt(session_a);
+   if(!BossEvent.IsNewSession()) Pass("Session Init"); else Fail("Session Init");
+
+   BossEvent.PollAt(session_b);
+   if(BossEvent.IsNewSession()) Pass("Session Change"); else Fail("Session Change");
+
+   BossEvent.PollAt(session_c);
+   if(!BossEvent.IsNewSession()) Pass("Session One Shot"); else Fail("Session One Shot");
 
    BossEvent.Shutdown();
 
