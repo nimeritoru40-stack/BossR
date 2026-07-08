@@ -13,6 +13,30 @@ int g_fail = 0;
 void Pass(string test_name){ g_pass++; Print("PASS: ", test_name); }
 void Fail(string test_name){ g_fail++; Print("FAIL: ", test_name); }
 
+class C_TestHandler : public C_BossR_EventHandler
+{
+public:
+   int calls;
+   int last_event_id;
+
+   C_TestHandler()
+   {
+      Reset();
+   }
+
+   void Reset()
+   {
+      calls = 0;
+      last_event_id = BOSSR_EVENT_NONE;
+   }
+
+   void OnEvent(const int event_id)
+   {
+      calls++;
+      last_event_id = event_id;
+   }
+};
+
 int OnInit()
 {
    Print("=== BossR_Event Verification Started ===");
@@ -132,7 +156,8 @@ int OnInit()
 
    BossEvent.PollAt(hour_c);
    if(!BossEvent.IsNewHour()) Pass("Hour One Shot"); else Fail("Hour One Shot");
-      if(!BossEvent.ConfigureSession(-1, 0)) Pass("ConfigureSession rejects negative hour"); else Fail("ConfigureSession rejects negative hour");
+
+   if(!BossEvent.ConfigureSession(-1, 0)) Pass("ConfigureSession rejects negative hour"); else Fail("ConfigureSession rejects negative hour");
    if(!BossEvent.ConfigureSession(24, 0)) Pass("ConfigureSession rejects hour above 23"); else Fail("ConfigureSession rejects hour above 23");
    if(!BossEvent.ConfigureSession(8, -1)) Pass("ConfigureSession rejects negative minute"); else Fail("ConfigureSession rejects negative minute");
    if(!BossEvent.ConfigureSession(8, 60)) Pass("ConfigureSession rejects minute above 59"); else Fail("ConfigureSession rejects minute above 59");
@@ -152,6 +177,41 @@ int OnInit()
 
    BossEvent.PollAt(session_c);
    if(!BossEvent.IsNewSession()) Pass("Session One Shot"); else Fail("Session One Shot");
+
+   C_TestHandler handler_a;
+   C_TestHandler handler_b;
+
+   if(BossEvent.HandlerCount() == 0) Pass("Initial HandlerCount zero"); else Fail("Initial HandlerCount zero");
+
+   if(!BossEvent.RegisterHandler(BOSSR_EVENT_NONE, handler_a)) Pass("RegisterHandler rejects event none"); else Fail("RegisterHandler rejects event none");
+   if(!BossEvent.RegisterHandler(BOSSR_EVENT_MAX_ID, handler_a)) Pass("RegisterHandler rejects max event id"); else Fail("RegisterHandler rejects max event id");
+
+   if(BossEvent.RegisterHandler(BOSSR_EVENT_NEW_BAR, handler_a)) Pass("RegisterHandler accepts handler A"); else Fail("RegisterHandler accepts handler A");
+   if(BossEvent.HandlerCount() == 1) Pass("HandlerCount after handler A"); else Fail("HandlerCount after handler A");
+
+   if(!BossEvent.RegisterHandler(BOSSR_EVENT_NEW_BAR, handler_a)) Pass("RegisterHandler rejects duplicate handler"); else Fail("RegisterHandler rejects duplicate handler");
+
+   if(BossEvent.RegisterHandler(BOSSR_EVENT_NEW_BAR, handler_b)) Pass("RegisterHandler accepts handler B same event"); else Fail("RegisterHandler accepts handler B same event");
+   if(BossEvent.HandlerCount() == 2) Pass("HandlerCount after handler B"); else Fail("HandlerCount after handler B");
+
+   if(BossEvent.FireEvent(BOSSR_EVENT_NEW_BAR) == 2) Pass("FireEvent dispatches to two handlers"); else Fail("FireEvent dispatches to two handlers");
+   if(handler_a.calls == 1 && handler_a.last_event_id == BOSSR_EVENT_NEW_BAR) Pass("Handler A received event"); else Fail("Handler A received event");
+   if(handler_b.calls == 1 && handler_b.last_event_id == BOSSR_EVENT_NEW_BAR) Pass("Handler B received event"); else Fail("Handler B received event");
+
+   if(BossEvent.UnregisterHandler(BOSSR_EVENT_NEW_BAR, handler_a)) Pass("UnregisterHandler removes handler A"); else Fail("UnregisterHandler removes handler A");
+   if(BossEvent.HandlerCount() == 1) Pass("HandlerCount after unregister handler A"); else Fail("HandlerCount after unregister handler A");
+
+   handler_a.Reset();
+   handler_b.Reset();
+
+   if(BossEvent.FireEvent(BOSSR_EVENT_NEW_BAR) == 1) Pass("FireEvent dispatches to one handler after unregister"); else Fail("FireEvent dispatches to one handler after unregister");
+   if(handler_a.calls == 0) Pass("Handler A not called after unregister"); else Fail("Handler A not called after unregister");
+   if(handler_b.calls == 1 && handler_b.last_event_id == BOSSR_EVENT_NEW_BAR) Pass("Handler B still receives event"); else Fail("Handler B still receives event");
+
+   BossEvent.ClearHandlers();
+
+   if(BossEvent.HandlerCount() == 0) Pass("ClearHandlers resets handler count"); else Fail("ClearHandlers resets handler count");
+   if(BossEvent.FireEvent(BOSSR_EVENT_NEW_BAR) == 0) Pass("FireEvent returns zero after ClearHandlers"); else Fail("FireEvent returns zero after ClearHandlers");
 
    BossEvent.Shutdown();
 
